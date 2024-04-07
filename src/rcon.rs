@@ -97,12 +97,14 @@ pub async fn do_command(ctx: Context<'_>, command: String) -> Result<(), Error> 
         let mut rcon = ctx.data().rcon.lock().await;
         rcon.send_command(&command).await?
     };
-    ctx.send(
-        poise::CreateReply::default()
-            .content(response)
-            .ephemeral(true),
-    )
-    .await?;
+    if !response.is_empty() {
+        ctx.send(
+            poise::CreateReply::default()
+                .content(response)
+                .ephemeral(true),
+        )
+        .await?;
+    }
     Ok(())
 }
 
