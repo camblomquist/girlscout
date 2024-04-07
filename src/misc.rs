@@ -44,10 +44,13 @@ pub mod apt {
 
     #[poise::command(slash_command, hide_in_help)]
     pub async fn moo(ctx: Context<'_>) -> Result<(), Error> {
-        let tagline = r#"..."Have you mooed today?"..."#;
         let i = time::UNIX_EPOCH.elapsed().unwrap().as_secs() as usize % COWS.len();
-        let msg = format!("```\n{}{}\n```", COWS[i], tagline);
+        let msg = format!("```\n{}...\"Have you mooed today?\"...\n```", COWS[i]);
         ctx.say(msg).await?;
-        do_command(ctx, format!(r#"/tellraw @a "{{"text":"{}"}}"#, tagline)).await
+        do_command(
+            ctx,
+            format!(r#"/tellraw @a "{{"text":"...\"Have you mooed today?\"..."}}"#),
+        )
+        .await
     }
 }
