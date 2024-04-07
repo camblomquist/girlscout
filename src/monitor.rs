@@ -340,7 +340,13 @@ pub mod sub {
                 },
             };
 
-            start_service(ctx, monitor_type).await
+            ctx.defer_ephemeral().await?;
+
+            start_service(ctx, monitor_type).await?;
+
+            ctx.say("Started service").await?;
+
+            Ok(())
         }
     }
 
