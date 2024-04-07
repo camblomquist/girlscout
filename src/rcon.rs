@@ -93,18 +93,23 @@ impl RconClient {
 }
 
 pub async fn do_command(ctx: Context<'_>, command: String) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
+
     let response = {
         let mut rcon = ctx.data().rcon.lock().await;
         rcon.send_command(&command).await?
     };
-    if !response.is_empty() {
-        ctx.send(
-            poise::CreateReply::default()
-                .content(response)
-                .ephemeral(true),
-        )
-        .await?;
-    }
+    let response = if !response.is_empty() {
+        &response
+    } else {
+        "Executed command."
+    };
+    ctx.send(
+        poise::CreateReply::default()
+            .content(response)
+            .ephemeral(true),
+    )
+    .await?;
     Ok(())
 }
 
