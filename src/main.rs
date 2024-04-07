@@ -5,7 +5,10 @@ use monitor::MonitorService;
 use poise::serenity_prelude::{self as serenity, ChannelId};
 use rcon::RconClient;
 use serde_json::Value;
-use tokio::sync::Mutex;
+use tokio::{
+    signal::unix::{signal, SignalKind},
+    sync::Mutex,
+};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::monitor::ServiceContext;
@@ -116,7 +119,8 @@ async fn main() {
                 let services_clone = services.clone();
                 let token = cancel_token.clone();
                 tokio::spawn(async move {
-                    tokio::signal::ctrl_c().await.unwrap();
+                    let mut signal = signal(SignalKind::terminate()).unwrap();
+                    signal.recv().await.unwrap();
 
                     log::info!("Stopping services...");
 
