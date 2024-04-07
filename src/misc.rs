@@ -48,6 +48,6 @@ pub mod apt {
         let i = time::UNIX_EPOCH.elapsed().unwrap().as_secs() as usize % COWS.len();
         let msg = format!("```\n{}{}\n```", COWS[i], tagline);
         ctx.say(msg).await?;
-        do_command(ctx, format!("say \"{tagline}\"")).await
+        do_command(ctx, format!(r#"/tellraw @a "{{"text":"{}"}}"#, tagline)).await
     }
 }
