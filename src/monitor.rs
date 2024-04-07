@@ -130,6 +130,8 @@ impl MonitorService {
             _ => Ok(true),
         };
 
+        log::info!("Service in {} finished", self.channel_id());
+
         match res {
             Ok(false) => {
                 let mut services = ctx.services.lock().await;
@@ -138,6 +140,8 @@ impl MonitorService {
                     .position(|s| s.channel_id() == self.channel_id())
                     .unwrap();
                 services.swap_remove(index);
+
+                log::info!("Removed service in {}", self.channel_id());
             }
             Err(err) => {
                 // Not much else we can do
@@ -176,6 +180,8 @@ impl MonitorService {
         let mut attachments = EditAttachments::new();
 
         while let Ok(mut msg) = self.http.get_message(cid, mid).await {
+            log::info!("Updating status for {}:{}", host, port);
+
             if let Ok(mut stream) = TcpStream::connect((host, port)).await {
                 stream.write_all(&handshake).await?;
                 stream.write_all(&[0]).await?;
@@ -253,11 +259,14 @@ impl MonitorService {
             )
             .await?;
 
+            log::info!("Updated status for {}:{}", host, port);
+
             tokio::select! {
                 _ = self.token.cancelled() => break,
                 _ = time::sleep(Duration::from_secs(60)) => ()
             }
         }
+
         Ok(self.token.is_cancelled())
     }
 }
