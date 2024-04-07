@@ -162,6 +162,8 @@ impl MonitorService {
         port: u16,
         mid: MessageId,
     ) -> Result<bool, Error> {
+        log::info!("Running status service in {}:{}", self.channel_id(), mid);
+
         let mut handshake = Vec::with_capacity(host.len() + 5);
         let mut vibuf = [0; 5];
         let len = varint_encode(host.len() as i32, &mut vibuf);
@@ -182,9 +184,8 @@ impl MonitorService {
         let mut prev_favicon = String::new();
         let mut attachments = EditAttachments::new();
 
-        //while let Ok(mut msg) = self.http.get_message(cid, mid).await {
         loop {
-            let mut msg = self.http.get_message(cid, mid).await?;
+            let mut msg = cid.message(&self.http, mid).await?;
 
             log::info!("Updating status for {}:{}", host, port);
 
