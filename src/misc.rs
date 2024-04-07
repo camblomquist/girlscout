@@ -49,7 +49,7 @@ pub mod apt {
         ctx.say(msg).await?;
         do_command(
             ctx,
-            format!(r#"/tellraw @a "{{"text":"...\"Have you mooed today?\"..."}}"#),
+            format!(r#"/tellraw @a {{"text":"...\"Have you mooed today?\"..."}}"#),
         )
         .await
     }
