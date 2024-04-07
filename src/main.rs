@@ -63,6 +63,9 @@ async fn main() {
         .setup(move |ctx, ready, framework| {
             Box::pin(async move {
                 log::info!("Logged in as {}", ready.user.name);
+
+                log::info!("Registering commands...");
+
                 for guild in &ready.guilds {
                     poise::builtins::register_in_guild(
                         ctx,
@@ -71,6 +74,12 @@ async fn main() {
                     )
                     .await?;
                 }
+
+                log::info!(
+                    "Registered {} commands in {} guilds",
+                    framework.options().commands.len(),
+                    ready.guilds.len()
+                );
 
                 let tracker = TaskTracker::new();
                 let cancel_token = CancellationToken::new();
@@ -90,6 +99,10 @@ async fn main() {
                     })
                     .collect::<Vec<_>>()
                     .await;
+
+                log::info!("Starting services...");
+
+                let service_count = services.len();
                 let services = Arc::new(Mutex::new(services));
                 for service in &*services.lock().await {
                     let services = services.clone();
@@ -97,16 +110,24 @@ async fn main() {
                     let ctx = ServiceContext::new(services.clone());
                     tracker.spawn(async move { service.run(ctx).await });
                 }
+
+                log::info!("Started {} services", service_count);
+
                 let services_clone = services.clone();
                 let token = cancel_token.clone();
                 tokio::spawn(async move {
                     tokio::signal::ctrl_c().await.unwrap();
+
+                    log::info!("Stopping services...");
+
                     token.cancel();
                     let services = services_clone.lock().await;
                     let data = serde_json::to_string(&*services).unwrap();
                     tokio::fs::write(data_path.join("services.json"), data.as_bytes())
                         .await
                         .expect("Failed to serialize services");
+
+                    log::info!("Stopped {} services", services.len());
                 });
 
                 let services = (tracker, services);
