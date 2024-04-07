@@ -277,6 +277,8 @@ pub mod sub {
     use std::io::{self, ErrorKind};
     use std::sync::Arc;
 
+    use poise::ChoiceParameter;
+
     use crate::monitor::{MonitorParameter, MonitorService, MonitorType};
     use crate::{Context, Error};
 
@@ -293,9 +295,11 @@ pub mod sub {
         let service = Arc::new(service);
         let (tracker, services) = &ctx.data().services;
         let service_clone = service.clone();
-        let ctx = ServiceContext::from_ctx(ctx);
-        tracker.spawn(async move { service_clone.run(ctx).await });
+        let sctx = ServiceContext::from_ctx(ctx);
+        tracker.spawn(async move { service_clone.run(sctx).await });
         services.lock().await.push(service);
+
+        log::info!("New service started in {}", ctx.channel_id());
 
         Ok(())
     }
@@ -321,6 +325,12 @@ pub mod sub {
                 "A monitor service already exists in this channel",
             )))
         } else {
+            log::info!(
+                "Starting new {} service in {}",
+                monitor_type.name(),
+                ctx.channel_id()
+            );
+
             let monitor_type = match monitor_type {
                 MonitorParameter::Status => MonitorType::Status {
                     name: ctx.data().server_name.clone(),
@@ -342,9 +352,13 @@ pub mod sub {
             .iter()
             .position(|service| service.channel_id() == channel_id);
         if let Some(index) = index {
+            log::info!("Stopping services in {}...", ctx.channel_id());
+
             services[index].cancel();
             services.swap_remove(index);
             ctx.say("Service stopped").await?;
+
+            log::info!("Service in {} stopped", ctx.channel_id());
             Ok(())
         } else {
             Err(Box::new(io::Error::new(
