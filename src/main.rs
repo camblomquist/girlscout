@@ -51,15 +51,10 @@ async fn main() {
     let options = poise::FrameworkOptions {
         commands: vec![
             misc::apt(),
-            misc::apt::moo(),
             monitor::monitor(),
-            monitor::sub::start(),
-            monitor::sub::stop(),
             rcon::command(),
             rcon::say(),
             rcon::whitelist(),
-            rcon::whitelist::add(),
-            rcon::whitelist::remove(),
         ],
         ..Default::default()
     };
@@ -68,7 +63,14 @@ async fn main() {
         .setup(move |ctx, ready, framework| {
             Box::pin(async move {
                 log::info!("Logged in as {}", ready.user.name);
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                for guild in &ready.guilds {
+                    poise::builtins::register_in_guild(
+                        ctx,
+                        &framework.options().commands,
+                        guild.id,
+                    )
+                    .await?;
+                }
 
                 let tracker = TaskTracker::new();
                 let cancel_token = CancellationToken::new();
