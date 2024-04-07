@@ -132,23 +132,26 @@ impl MonitorService {
 
         log::info!("Service in {} finished", self.channel_id());
 
-        match res {
-            Ok(false) => {
-                let mut services = ctx.services.lock().await;
-                let index = services
-                    .iter()
-                    .position(|s| s.channel_id() == self.channel_id())
-                    .unwrap();
-                services.swap_remove(index);
-
-                log::info!("Removed service in {}", self.channel_id());
-            }
+        let should_remove = match res {
+            Ok(false) => true,
             Err(err) => {
                 // Not much else we can do
                 log::error!("{err}");
+                true
             }
-            _ => (),
+            _ => false,
         };
+
+        if should_remove {
+            let mut services = ctx.services.lock().await;
+            let index = services
+                .iter()
+                .position(|s| s.channel_id() == self.channel_id())
+                .unwrap();
+            services.swap_remove(index);
+
+            log::info!("Removed service in {}", self.channel_id());
+        }
         Ok(())
     }
 
@@ -179,7 +182,10 @@ impl MonitorService {
         let mut prev_favicon = String::new();
         let mut attachments = EditAttachments::new();
 
-        while let Ok(mut msg) = self.http.get_message(cid, mid).await {
+        //while let Ok(mut msg) = self.http.get_message(cid, mid).await {
+        loop {
+            let mut msg = self.http.get_message(cid, mid).await?;
+
             log::info!("Updating status for {}:{}", host, port);
 
             if let Ok(mut stream) = TcpStream::connect((host, port)).await {
