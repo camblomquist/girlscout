@@ -118,9 +118,14 @@ async fn main() {
 
                 let services_clone = services.clone();
                 let token = cancel_token.clone();
+                let shard_manager = framework.shard_manager().clone();
                 tokio::spawn(async move {
                     let mut signal = signal(SignalKind::terminate()).unwrap();
                     signal.recv().await.unwrap();
+
+                    log::info!("Stopping client...");
+
+                    shard_manager.shutdown_all().await;
 
                     log::info!("Stopping services...");
 
@@ -152,5 +157,10 @@ async fn main() {
     let client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .await;
+
+    log::info!("Starting client...");
+
     client.unwrap().start().await.unwrap();
+
+    log::info!("Client stopped");
 }
