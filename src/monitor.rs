@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use itertools::Itertools;
@@ -17,7 +17,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{Context, Error};
 
-const PROTOCOL_VERSION: u8 = 47;
+const PROTOCOL_VERSION: i32 = 763;
+const PACKET_ID: i32 = 0;
+const NEXT_STATE: i32 = 1;
 
 fn varint_encode(mut value: i32, out: &mut [u8]) -> usize {
     const SEGMENT: i32 = 0x7F;
@@ -38,7 +40,7 @@ fn varint_decode(bytes: &[u8]) -> (i32, usize) {
     let mut x: i32 = 0;
     let mut len = 5;
     for (i, byte) in bytes.iter().enumerate() {
-        x |= ((byte * 0x7F) as i32) << (7 * i);
+        x |= ((byte & 0x7F) as i32) << (7 * i);
         if (byte & 0x80) == 0 {
             len = i + 1;
             break;
@@ -162,17 +164,38 @@ impl MonitorService {
         port: u16,
         mid: MessageId,
     ) -> Result<bool, Error> {
-        log::info!("Running status service in {}:{}", self.channel_id(), mid);
-
-        let mut handshake = Vec::with_capacity(host.len() + 5);
         let mut vibuf = [0; 5];
+        let len = varint_encode(PACKET_ID, &mut vibuf)
+            + varint_encode(PROTOCOL_VERSION, &mut vibuf)
+            + varint_encode(host.len() as _, &mut vibuf)
+            + host.len()
+            + mem::size_of_val(&port)
+            + varint_encode(NEXT_STATE, &mut vibuf);
+
+        let mut handshake = Vec::with_capacity(len + varint_encode(len as _, &mut vibuf));
+
+        let len = varint_encode(len as _, &mut vibuf);
+        handshake.extend_from_slice(&vibuf[..len]);
+
+        let len = varint_encode(PACKET_ID, &mut vibuf);
+        handshake.extend_from_slice(&vibuf[..len]);
+
+        let len = varint_encode(PROTOCOL_VERSION, &mut vibuf);
+        handshake.extend_from_slice(&vibuf[..len]);
+
         let len = varint_encode(host.len() as i32, &mut vibuf);
-        handshake.push(PROTOCOL_VERSION);
-        handshake.extend_from_slice(&vibuf[0..len]);
+        handshake.extend_from_slice(&vibuf[..len]);
+
         handshake.extend_from_slice(host.as_bytes());
         handshake.extend_from_slice(&port.to_be_bytes());
-        handshake.push(0x01);
-        let handshake = handshake;
+
+        let len = varint_encode(NEXT_STATE, &mut vibuf);
+        handshake.extend_from_slice(&vibuf[..len]);
+
+        let handshake = &handshake;
+
+        let request = &[1, 0];
+
         let cid = self.channel_id;
 
         let mut is_online;
@@ -190,19 +213,25 @@ impl MonitorService {
             log::info!("Updating status for {}:{}", host, port);
 
             if let Ok(mut stream) = TcpStream::connect((host, port)).await {
-                stream.write_all(&handshake).await?;
-                stream.write_all(&[0]).await?;
+                stream.write_all(handshake).await?;
+                stream.write_all(request).await?;
 
                 stream.read_exact(&mut vibuf).await?;
                 let (len, i) = varint_decode(&vibuf);
                 let len = len as usize;
                 let mut buf = Vec::with_capacity(len);
                 buf.extend_from_slice(&vibuf[i..]);
-                let start = buf.len();
+                let i = buf.len();
                 buf.resize(len, 0);
-                stream.read_exact(&mut buf[start..]).await?;
+                stream.read_exact(&mut buf[i..]).await?;
 
-                let status: json::Value = json::from_slice(&buf)?;
+                // First byte is ID, don't care
+                let buf = &buf[1..];
+                // Next is the string length,
+                // don't care since we allocated for the whole message
+                let (_, i) = varint_decode(&buf[..5]);
+
+                let status: json::Value = json::from_slice(&buf[i..])?;
 
                 version = status["version"]["name"].to_string();
                 description = status["description"]["text"].to_string();
@@ -218,7 +247,7 @@ impl MonitorService {
                             .map(|player| player["name"].to_string())
                             .join(", ")
                     })
-                    .unwrap_or_else(|| "Unknown".to_string());
+                    .unwrap_or_else(|| "None".to_string());
 
                 let favicon = status["favicon"]
                     .as_str()
@@ -249,20 +278,23 @@ impl MonitorService {
 
             msg.edit(
                 &self.http,
-                EditMessage::new().attachments(attachments.clone()).embed(
-                    CreateEmbed::new()
-                        .title(name)
-                        .description(&description)
-                        .attachment("server-icon.png")
-                        .fields([
-                            ("Status", status, true),
-                            ("Players", &format!("{player_count}/{player_max}"), true),
-                            ("Version", &version, true),
-                            ("Currently Online", &player_sample, false),
-                        ])
-                        .timestamp(Timestamp::now())
-                        .color(color),
-                ),
+                EditMessage::new()
+                    .content("")
+                    .attachments(attachments.clone())
+                    .embed(
+                        CreateEmbed::new()
+                            .title(name)
+                            .description(&description)
+                            .thumbnail("attachment://server-icon.png")
+                            .fields([
+                                ("Status", status, true),
+                                ("Players", &format!("{player_count}/{player_max}"), true),
+                                ("Version", &version, true),
+                                ("Currently Online", &player_sample, false),
+                            ])
+                            .timestamp(Timestamp::now())
+                            .color(color),
+                    ),
             )
             .await?;
 
