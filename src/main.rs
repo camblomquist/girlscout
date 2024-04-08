@@ -108,7 +108,7 @@ async fn main() {
                         Arc::new(MonitorService::new(
                             ctx.http.clone(),
                             cancel_token.child_token(),
-                            ChannelId::new(value["channel_id"].to_string().parse().unwrap()),
+                            serde_json::from_value(value["channel_id"].clone()).unwrap(),
                             serde_json::from_value(value["monitor_type"].clone()).unwrap(),
                         ))
                     })
