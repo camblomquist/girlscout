@@ -87,7 +87,7 @@ impl RconClient {
         }
     }
 
-    async fn send_command(&mut self, command: &str) -> Result<String, Error> {
+    pub async fn send_command(&mut self, command: &str) -> Result<String, Error> {
         self.send(2, command).await
     }
 }

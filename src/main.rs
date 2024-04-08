@@ -44,7 +44,7 @@ async fn main() {
     let server_port: u16 =
         std::env::var("SEVER_PORT").map_or(25565, |p| p.parse().expect("Invalid SERVER_PORT"));
 
-    let mut commands = vec![monitor::monitor()];
+    let mut commands = vec![monitor::monitor(), misc::apt()];
 
     let rcon = if let Ok(rcon_password) = std::env::var("RCON_PASSWORD") {
         let rcon_port: u16 =
@@ -53,7 +53,7 @@ async fn main() {
         let rcon = RconClient::connect((server_hostname.as_ref(), rcon_port), &rcon_password).await;
         match rcon {
             Ok(rcon) => {
-                commands.extend([rcon::command(), rcon::say(), rcon::whitelist(), misc::apt()]);
+                commands.extend([rcon::command(), rcon::say(), rcon::whitelist()]);
                 Some(Mutex::new(rcon))
             }
             Err(err) => {
