@@ -96,7 +96,18 @@ pub async fn do_command(ctx: Context<'_>, command: String) -> Result<(), Error> 
     ctx.defer_ephemeral().await?;
 
     let response = {
-        let mut rcon = ctx.data().rcon.lock().await;
+        let mut rcon = ctx
+            .data()
+            .rcon
+            .as_ref()
+            .ok_or_else(|| {
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotConnected,
+                    "Rcon connection is unavailable",
+                ))
+            })?
+            .lock()
+            .await;
         rcon.send_command(&command).await?
     };
     let response = if !response.is_empty() {

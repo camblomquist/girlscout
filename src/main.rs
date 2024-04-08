@@ -26,7 +26,7 @@ pub struct Data {
     server_name: String,
     server_hostname: String,
     server_port: u16,
-    rcon: Mutex<RconClient>,
+    rcon: Option<Mutex<RconClient>>,
     services: (TaskTracker, Arc<Mutex<Vec<Arc<MonitorService>>>>),
     cancel_token: CancellationToken,
 }
@@ -43,22 +43,34 @@ async fn main() {
     let server_hostname = std::env::var("SERVER_HOST").unwrap_or_else(|_| "localhost".into());
     let server_port: u16 =
         std::env::var("SEVER_PORT").map_or(25565, |p| p.parse().expect("Invalid SERVER_PORT"));
-    let rcon_port: u16 =
-        std::env::var("RCON_PORT").map_or(25575, |p| p.parse().expect("Invalid RCON_PORT"));
-    let rcon_password = std::env::var("RCON_PASSWORD").expect("missing RCON_PASSWORD");
-    let rcon = RconClient::connect((server_hostname.as_ref(), rcon_port), &rcon_password)
-        .await
-        .expect("RCON Unable to connect");
-    let rcon = Mutex::new(rcon);
+
+    let mut commands = vec![monitor::monitor()];
+
+    let rcon = if let Ok(rcon_password) = std::env::var("RCON_PASSWORD") {
+        let rcon_port: u16 =
+            std::env::var("RCON_PORT").map_or(25575, |p| p.parse().expect("Invalid RCON_PORT"));
+
+        let rcon = RconClient::connect((server_hostname.as_ref(), rcon_port), &rcon_password).await;
+        match rcon {
+            Ok(rcon) => {
+                commands.extend([rcon::command(), rcon::say(), rcon::whitelist(), misc::apt()]);
+                Some(Mutex::new(rcon))
+            }
+            Err(err) => {
+                log::warn!(
+                    "Unable to connect to rcon (Error: {}) Commands using rcon will be unavailable",
+                    err
+                );
+                None
+            }
+        }
+    } else {
+        log::warn!("No RCON_PASSWORD provided. Commands using rcon will be unavailable");
+        None
+    };
 
     let options = poise::FrameworkOptions {
-        commands: vec![
-            misc::apt(),
-            monitor::monitor(),
-            rcon::command(),
-            rcon::say(),
-            rcon::whitelist(),
-        ],
+        commands,
         ..Default::default()
     };
 
