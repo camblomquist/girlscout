@@ -302,7 +302,7 @@ impl MonitorService {
 
             tokio::select! {
                 _ = self.token.cancelled() => break,
-                _ = time::sleep(Duration::from_secs(60)) => ()
+                _ = time::sleep(Duration::from_secs(250)) => ()
             }
         }
 
