@@ -398,6 +398,7 @@ pub mod sub {
         }
     }
 
+    /// Stop the service running in this channel
     #[poise::command(slash_command)]
     pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
         let channel_id = ctx.channel_id();
