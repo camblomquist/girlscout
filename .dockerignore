@@ -1,3 +1,6 @@
+scribe
 target
 .git
+.github
 .gitignore
+.vscode
